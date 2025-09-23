@@ -39,6 +39,19 @@ function ensureAttribute(content, attribute, value) {
   return content.replace('<html', `<html ${attribute}="${value}"`);
 }
 
+function convertAnchorHrefs(content) {
+  const anchorRegex = /(<a\b[^>]*\bhref=")\/(?!\/)([^"]*)"/g;
+  return content.replace(anchorRegex, (match, prefix, path) => {
+    let normalized = path;
+    if (!path) {
+      normalized = './';
+    } else if (path[0] === '?') {
+      normalized = `.${path}`;
+    }
+    return `${prefix}${normalized}"`;
+  });
+}
+
 function applyBasePath(htmlPath, options) {
   const relative = path.relative(repoRoot, htmlPath);
   const isAdmin = relative === 'admin/index.html' || relative === path.join('src', 'admin', 'index.html');
@@ -56,7 +69,7 @@ function applyBasePath(htmlPath, options) {
       content = content.replace(adminPattern, adminReplacement);
     }
   } else {
-    const headPattern = /<link rel="stylesheet" href="\/assets\/css\/main.css"><script async="async" src="\/assets\/js\/main.bundle.js"><\/script>/;
+    const headPattern = /<link rel="stylesheet" href="\/assets\/css\/main.css">\s*<script[^>]*src="\/assets\/js\/main.bundle.js"><\/script>/;
     const headReplacement = `<script>(function(){var d=document;var attr=d.documentElement.getAttribute("data-base-path");var base="/";var knownAttr=d.documentElement.getAttribute("data-known-roots");var known=knownAttr?knownAttr.split(","):[];if(attr&&attr!=="auto"){base=attr;}else{var segments=location.pathname.split("/").filter(Boolean);if(segments.length&&known.indexOf(segments[0])===-1){base="/"+segments[0]+"/";}}if(base.slice(-1)!=="/"){base+="/";}window.__BASE_PATH__=base;var baseEl=d.createElement("base");baseEl.href=base;d.head.appendChild(baseEl);var link=d.createElement("link");link.rel="stylesheet";link.href=base+"assets/css/main.css";d.head.appendChild(link);var script=d.createElement("script");script.async=true;script.src=base+"assets/js/main.bundle.js";d.head.appendChild(script);}());</script><noscript><link rel="stylesheet" href="/assets/css/main.css"></noscript>`;
     if (headPattern.test(content)) {
       content = content.replace(headPattern, headReplacement);
@@ -70,6 +83,8 @@ function applyBasePath(htmlPath, options) {
       content = content.replace('</body></html>', `${footerScript}</body></html>`);
     }
   }
+
+  content = convertAnchorHrefs(content);
 
   fs.writeFileSync(htmlPath, content);
 }
